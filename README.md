@@ -4,14 +4,31 @@ The BlackTwist MCP (Model Context Protocol) server allows AI assistants like Cla
 
 ## Quick Start
 
-### 1. Generate an API Key
+There are two ways to connect to the BlackTwist MCP server: **OAuth** (recommended for claude.ai) or **API Key** (for desktop clients and CLI tools).
 
-1. Open [**BlackTwist**](https://blacktwist.app/) and go to **Settings**
+### Option A: Connect via OAuth (claude.ai)
+
+If you're using **claude.ai** as a custom connector, OAuth is the easiest option — no API key needed.
+
+1. Go to **claude.ai** > **Settings** > **Integrations** (or add a custom connector)
+2. Enter the MCP server URL: `https://blacktwist.app/api/mcp`
+3. Claude will automatically discover the OAuth endpoints, register itself, and redirect you to sign in with your BlackTwist account
+4. Once signed in, the connection is established — Claude can now use your BlackTwist account
+
+OAuth tokens refresh automatically, so you won't need to re-authenticate unless you revoke access.
+
+### Option B: Connect via API Key
+
+For **Claude Desktop**, **Claude Code**, **Cursor**, and other MCP clients that don't support OAuth, use an API key.
+
+#### 1. Generate an API Key
+
+1. Open **BlackTwist** and go to **Settings** (gear icon)
 2. Click the **MCP** tab in the sidebar
 3. Click **Create API Key**, give it a name (e.g. "Claude Desktop"), and click **Create Key**
 4. Copy the key immediately — it won't be shown again
 
-### 2. Configure Your MCP Client
+#### 2. Configure Your MCP Client
 
 Add the following to your MCP client configuration:
 
@@ -104,12 +121,12 @@ Once connected, you can ask your AI assistant things like:
 
 ## Server Details
 
-| Property      | Value                            |
-| ------------- | -------------------------------- |
-| **URL**       | `https://blacktwist.app/api/mcp` |
-| **Auth**      | Bearer token (API key)           |
-| **Transport** | Streamable HTTP (stateless)      |
-| **Protocol**  | MCP via JSON-RPC over HTTP POST  |
+| Property      | Value                                      |
+| ------------- | ------------------------------------------ |
+| **URL**       | `https://blacktwist.app/api/mcp`           |
+| **Auth**      | OAuth 2.1 (PKCE) or Bearer token (API key) |
+| **Transport** | Streamable HTTP (stateless)                |
+| **Protocol**  | MCP via JSON-RPC over HTTP POST            |
 
 ---
 
@@ -121,7 +138,7 @@ Most tools accept an optional `teamId` parameter to scope operations to a specif
 
 1. If `teamId` is a team ID, the tool operates in that team's context (membership is verified).
 2. If `teamId` is `"personal"`, the tool operates in **personal mode** (user's own data only, no team).
-3. If `teamId` is omitted, the tool falls back to the user's **currently active team**. If no team is active, this is equivalent to `"personal"`.
+3. If `teamId` is omitted, the tool falls back to the user's **currently active team** (from user settings). If no team is active, this is equivalent to `"personal"`.
 
 **Tools that support `teamId`:** `list_providers`, `list_posts`, `list_drafts`, `create_post`, `get_thread`, `delete_thread`, `reschedule_thread`, `list_time_slots`, `get_subscription`, `get_follow_up_templates`, and all analytics tools.
 
@@ -209,7 +226,7 @@ Each post object:
 {
   "providerId": "clx...",
   "posts": [
-    { "text": "Thread time! Here's what I learned this week" },
+    { "text": "Thread time! Here's what I learned this week 🧵" },
     { "text": "1/ First lesson: consistency beats perfection" },
     { "text": "2/ Second lesson: engage with your community daily" }
   ],
@@ -221,11 +238,12 @@ Each post object:
 
 List scheduled and published posts within a date range.
 
-| Parameter | Type   | Required | Description                                                                                 |
-| --------- | ------ | -------- | ------------------------------------------------------------------------------------------- |
-| `from`    | string | Yes      | Start date (ISO 8601)                                                                       |
-| `to`      | string | Yes      | End date (ISO 8601)                                                                         |
-| `teamId`  | string | No       | Team ID. If not provided, uses the active team. Pass `"personal"` for the personal account. |
+| Parameter    | Type   | Required | Description                                                                                 |
+| ------------ | ------ | -------- | ------------------------------------------------------------------------------------------- |
+| `from`       | string | Yes      | Start date (ISO 8601)                                                                       |
+| `to`         | string | Yes      | End date (ISO 8601)                                                                         |
+| `providerId` | string | No       | Provider ID (from `list_providers`). If provided, only returns posts for this provider.     |
+| `teamId`     | string | No       | Team ID. If not provided, uses the active team. Pass `"personal"` for the personal account. |
 
 #### `list_drafts`
 
@@ -548,6 +566,70 @@ Get your user settings including timezone, date format, and auto-repost config.
 
 ---
 
+## Prompts
+
+The MCP server includes built-in prompts &mdash; reusable templates that guide your AI assistant through multi-step workflows. In **Claude Desktop**, access them by typing `/` in the chat. In **Claude Code**, run `claude prompts` to list them.
+
+### `weekly-report`
+
+Generate a weekly performance report with engagement metrics, top posts, follower growth, and recommendations.
+
+**Arguments:**
+
+| Parameter        | Required | Description           |
+| ---------------- | -------- | --------------------- |
+| `providerUserId` | Yes      | Your provider user ID |
+
+**Example:** _"Run the weekly-report prompt for my Threads account"_
+
+### `content-ideas`
+
+Generate post ideas based on your best-performing content and posting patterns.
+
+**Arguments:**
+
+| Parameter        | Required | Description                                                             |
+| ---------------- | -------- | ----------------------------------------------------------------------- |
+| `providerUserId` | Yes      | Your provider user ID                                                   |
+| `topic`          | No       | Topic to focus on (e.g. &quot;productivity&quot;, &quot;startups&quot;) |
+
+**Example:** _"Give me content ideas about marketing"_
+
+### `optimize-schedule`
+
+Analyze your posting patterns and suggest an optimal posting schedule for the week.
+
+**Arguments:**
+
+| Parameter        | Required | Description           |
+| ---------------- | -------- | --------------------- |
+| `providerUserId` | Yes      | Your provider user ID |
+| `providerId`     | Yes      | Your provider ID      |
+
+**Example:** _"Help me optimize my posting schedule"_
+
+### `draft-review`
+
+Review your current drafts and get suggestions to improve them before publishing.
+
+**Arguments:** None
+
+**Example:** _"Review my drafts and tell me how to improve them"_
+
+### `monthly-recap`
+
+Generate a comprehensive monthly recap with key metrics, top posts, and growth trends.
+
+**Arguments:**
+
+| Parameter        | Required | Description           |
+| ---------------- | -------- | --------------------- |
+| `providerUserId` | Yes      | Your provider user ID |
+
+**Example:** _"Generate my monthly recap"_
+
+---
+
 ## API Key Management
 
 - **Create keys:** Settings > MCP > Create API Key
@@ -559,15 +641,45 @@ Keys are hashed with SHA-256 before storage. The raw key is only shown once at c
 
 ---
 
-## Technical Details
+## Authentication
 
-- **Endpoint:** `POST /api/mcp` (JSON-RPC)
-- **Transport:** Streamable HTTP (stateless, no session management)
-- **Auth:** API key validated via `Authorization: Bearer <key>` header
-- **Protocol:** MCP via JSON-RPC over HTTP POST
+The MCP server supports two authentication methods. Both use the `Authorization: Bearer <token>` header.
+
+### OAuth 2.1 (for claude.ai and OAuth-capable clients)
+
+The server implements the [MCP Authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) with OAuth 2.1 and PKCE (S256). OAuth-capable clients like claude.ai handle the flow automatically.
+
+**OAuth endpoints:**
+
+| Endpoint                                      | Description                              |
+| --------------------------------------------- | ---------------------------------------- |
+| `GET /.well-known/oauth-protected-resource`   | Resource metadata (RFC 9728)             |
+| `GET /.well-known/oauth-authorization-server` | Authorization server metadata (RFC 8414) |
+| `POST /api/mcp/oauth/register`                | Dynamic client registration (RFC 7591)   |
+| `GET /api/mcp/oauth/authorize`                | Authorization endpoint                   |
+| `POST /api/mcp/oauth/token`                   | Token exchange and refresh               |
+| `POST /api/mcp/oauth/revoke`                  | Token revocation (RFC 7009)              |
+
+**How it works:**
+
+1. The client discovers the OAuth endpoints via the well-known metadata
+2. The client registers itself using dynamic client registration
+3. The user is redirected to sign in with their BlackTwist account (uses the existing BlackTwist login)
+4. After sign-in, an authorization code is issued and exchanged for access + refresh tokens
+5. Access tokens expire after 1 hour and are refreshed automatically using the refresh token (30-day lifetime)
+
+### API Keys (for desktop clients and CLI tools)
+
+API keys are static tokens prefixed with `bt_mcp_`. They don't expire by default and are suitable for clients that don't support OAuth (Claude Desktop, Cursor, Claude Code CLI).
+
+See [API Key Management](#api-key-management) for how to create and manage keys.
 
 ---
 
-## License
+## Technical Details
 
-MIT
+- **Endpoint:** `POST /api/mcp` (JSON-RPC)
+- **Transport:** `WebStandardStreamableHTTPServerTransport` from `@modelcontextprotocol/sdk`
+- **Mode:** Stateless (no session management)
+- **Auth:** OAuth 2.1 with PKCE (S256) or API key via `Authorization: Bearer <key>` header
+- **Source code:** `src/libs/mcp/` (server, auth, oauth, tools), `src/app/api/mcp/` (route handler, OAuth endpoints)
