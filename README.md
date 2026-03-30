@@ -208,7 +208,7 @@ Each post object:
 | ----------- | -------- | -------- | -------------------------------------------------------------------------- |
 | `text`      | string   | Yes      | Post content                                                               |
 | `topic`     | string   | No       | Topic tag                                                                  |
-| `postMedia` | object[] | No       | Media attachments: `{ mediaKey, mimeType, width, height, size, altText? }` |
+| `media`     | object[] | No       | Media attachments via public URL (see [Media Attachments](#media-attachments)) |
 
 **Example — single post:**
 
@@ -233,6 +233,52 @@ Each post object:
   "scheduleAt": "2025-03-15T09:00:00"
 }
 ```
+
+#### Media Attachments
+
+Tools that accept `media` (`create_post`, `edit_post`, `edit_thread`, `set_thread_follow_up`) let you attach images and videos via public URLs. The server downloads, validates against Threads specs, and uploads them automatically.
+
+Each media object:
+
+| Field     | Type   | Required | Description                       |
+| --------- | ------ | -------- | --------------------------------- |
+| `url`     | string | Yes      | Public URL of the image or video  |
+| `altText` | string | No       | Alt text for accessibility        |
+
+**Threads image specs:**
+
+- Formats: JPEG, PNG
+- Max file size: 8 MB
+- Max aspect ratio: 10:1
+
+**Threads video specs:**
+
+- Formats: MP4, MOV
+- Max file size: 1 GB
+- Duration: up to 5 minutes
+- Max width: 1920px
+
+**Example — post with an image:**
+
+```json
+{
+  "providerId": "clx...",
+  "posts": [
+    {
+      "text": "Check out this view!",
+      "media": [
+        {
+          "url": "https://example.com/photo.jpg",
+          "altText": "Sunset over the mountains"
+        }
+      ]
+    }
+  ],
+  "scheduleAt": "2025-03-15T09:00:00"
+}
+```
+
+---
 
 #### `list_posts`
 
@@ -271,9 +317,9 @@ Edit the text content, topic, or media of a single post. Only posts with status 
 | `postId`    | string   | Yes      | The post ID (from `get_thread`)                                                                                    |
 | `content`   | string   | No       | New text content                                                                                                   |
 | `topic`     | string   | No       | New topic tag. Pass `null` to remove the topic.                                                                    |
-| `postMedia` | object[] | No       | Replace all media: `{ mediaKey, mimeType, width, height, size, altText? }`. Omit to keep existing media unchanged. |
+| `media`     | object[] | No       | Replace all media via public URL (see [Media Attachments](#media-attachments)). Omit to keep existing media unchanged. |
 
-At least one of `content`, `topic`, or `postMedia` must be provided.
+At least one of `content`, `topic`, or `media` must be provided.
 
 **Returns:** `postId`, `threadId`, `updated` (object indicating which fields were changed).
 
@@ -312,7 +358,7 @@ Each post object:
 | `id`        | string   | No       | Post ID for existing posts. Omit to create a new post in this position.    |
 | `text`      | string   | Yes      | Post content                                                               |
 | `topic`     | string   | No       | Topic tag                                                                  |
-| `postMedia` | object[] | No       | Media attachments: `{ mediaKey, mimeType, width, height, size, altText? }` |
+| `media`     | object[] | No       | Media attachments via public URL (see [Media Attachments](#media-attachments)) |
 
 New posts inherit `scheduledAt`, `provider`, `providerUserId`, and `teamId` from the existing thread.
 
@@ -493,8 +539,8 @@ Set or update the follow-up for a thread.
 | `numberOfReplies`         | number   | No       | Replies threshold                                                |
 | `numberOfRepliesEnabled`  | boolean  | No       | Enable replies trigger                                           |
 | `numberOfReposts`         | number   | No       | Reposts threshold                                                |
-| `numberOfRepostsEnabled`  | boolean  | No       | Enable reposts trigger                                           |
-| `autoPlugMedia`           | object[] | No       | Media attachments: `{ mediaKey, mimeType, width, height, size }` |
+| `numberOfRepostsEnabled`  | boolean  | No       | Enable reposts trigger                                                         |
+| `media`                   | object[] | No       | Media attachments via public URL (see [Media Attachments](#media-attachments)) |
 
 ---
 
@@ -682,4 +728,6 @@ See [API Key Management](#api-key-management) for how to create and manage keys.
 - **Transport:** `WebStandardStreamableHTTPServerTransport` from `@modelcontextprotocol/sdk`
 - **Mode:** Stateless (no session management)
 - **Auth:** OAuth 2.1 with PKCE (S256) or API key via `Authorization: Bearer <key>` header
+- **Unauthenticated discovery:** `initialize` and `tools/list` can be called without authentication, so MCP registries (e.g. Glama) can inspect available tools
+- **Rate limiting:** Authenticated requests are rate-limited to 60 req/min per IP. Unauthenticated discovery requests are limited to 10 req/min per IP.
 - **Source code:** `src/libs/mcp/` (server, auth, oauth, tools), `src/app/api/mcp/` (route handler, OAuth endpoints)
