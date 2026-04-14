@@ -204,13 +204,16 @@ Create a new post or thread. A thread is multiple posts linked together.
 
 Each post object:
 
-| Field       | Type     | Required | Description                                                                |
-| ----------- | -------- | -------- | -------------------------------------------------------------------------- |
-| `text`      | string   | Yes      | Post content                                                               |
-| `topic`     | string   | No       | Topic tag                                                                  |
-| `media`     | object[] | No       | Media attachments via public URL (see [Media Attachments](#media-attachments)) |
+| Field            | Type     | Required | Description                                                                                       |
+| ---------------- | -------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `text`           | string   | Yes      | Post content                                                                                      |
+| `topic`          | string   | No       | Topic tag                                                                                         |
+| `media`          | object[] | No       | Media attachments via public URL (see [Media Attachments](#media-attachments))                    |
+| `spoilerRanges`  | object[] | No       | Text spoiler ranges (see [Spoilers](#spoilers-threads-only))                                      |
+| `isSpoilerMedia` | boolean  | No       | If `true`, all media in this post is marked as a spoiler (see [Spoilers](#spoilers-threads-only)) |
 
 **Example — single post:**
+
 
 ```json
 {
@@ -278,6 +281,58 @@ Each media object:
 }
 ```
 
+#### Spoilers (Threads only)
+
+Spoilers allow you to hide portions of text or media behind a blur effect on Threads. Viewers tap to reveal the hidden content.
+
+**Text spoilers** are defined as an array of character ranges:
+
+| Field    | Type   | Required | Description                       |
+| -------- | ------ | -------- | --------------------------------- |
+| `offset` | number | Yes      | Character offset (0-indexed)      |
+| `length` | number | Yes      | Number of characters in the range |
+
+- Maximum 10 spoiler ranges per post
+- Ranges refer to character positions in the `text` field
+
+**Media spoilers** are a single boolean flag per post. When `isSpoilerMedia` is `true`, all media (images and videos) in the post is blurred until the viewer taps to reveal.
+
+Text and media spoilers are independent — a post can have both, either, or neither.
+
+**Example — post with text spoiler:**
+
+```json
+{
+  "providerId": "clx...",
+  "posts": [
+    {
+      "text": "The winner is John!",
+      "spoilerRanges": [{ "offset": 14, "length": 5 }]
+    }
+  ]
+}
+```
+
+**Example — post with media spoiler:**
+
+```json
+{
+  "providerId": "clx...",
+  "posts": [
+    {
+      "text": "Spoiler alert! Check the image",
+      "media": [{ "url": "https://example.com/reveal.jpg" }],
+      "isSpoilerMedia": true
+    }
+  ]
+}
+```
+
+**In responses** (`list_posts`, `list_drafts`, `get_thread`), each post includes:
+
+- `spoilerRanges`: array of `{ offset, length }` (empty if no text spoilers)
+- `isSpoilerMedia`: boolean (`true` if media is spoilered)
+
 ---
 
 #### `list_posts`
@@ -312,14 +367,16 @@ Get a specific thread with all its posts, media, and analytics.
 
 Edit the text content, topic, or media of a single post. Only posts with status `READY` (drafts or scheduled) can be edited — published, processing, or failed posts are rejected. Use `get_thread` first to retrieve post IDs.
 
-| Parameter   | Type     | Required | Description                                                                                                        |
-| ----------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| `postId`    | string   | Yes      | The post ID (from `get_thread`)                                                                                    |
-| `content`   | string   | No       | New text content                                                                                                   |
-| `topic`     | string   | No       | New topic tag. Pass `null` to remove the topic.                                                                    |
-| `media`     | object[] | No       | Replace all media via public URL (see [Media Attachments](#media-attachments)). Omit to keep existing media unchanged. |
+| Parameter        | Type     | Required | Description                                                                                                            |
+| ---------------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `postId`         | string   | Yes      | The post ID (from `get_thread`)                                                                                        |
+| `content`        | string   | No       | New text content                                                                                                       |
+| `topic`          | string   | No       | New topic tag. Pass `null` to remove the topic.                                                                        |
+| `media`          | object[] | No       | Replace all media via public URL (see [Media Attachments](#media-attachments)). Omit to keep existing media unchanged. |
+| `spoilerRanges`  | object[] | No       | Replace text spoiler ranges (see [Spoilers](#spoilers-threads-only)). Omit to keep unchanged. Pass `[]` to remove all. |
+| `isSpoilerMedia` | boolean  | No       | Set media spoiler flag. `true` = blurred, `false` = remove spoiler. Omit to keep unchanged.                            |
 
-At least one of `content`, `topic`, or `media` must be provided.
+At least one of `content`, `topic`, `media`, `spoilerRanges`, or `isSpoilerMedia` must be provided.
 
 **Returns:** `postId`, `threadId`, `updated` (object indicating which fields were changed).
 
@@ -353,12 +410,14 @@ Edit a thread by adding, removing, or reordering its posts. Provide the full des
 
 Each post object:
 
-| Field       | Type     | Required | Description                                                                |
-| ----------- | -------- | -------- | -------------------------------------------------------------------------- |
-| `id`        | string   | No       | Post ID for existing posts. Omit to create a new post in this position.    |
-| `text`      | string   | Yes      | Post content                                                               |
-| `topic`     | string   | No       | Topic tag                                                                  |
-| `media`     | object[] | No       | Media attachments via public URL (see [Media Attachments](#media-attachments)) |
+| Field            | Type     | Required | Description                                                                    |
+| ---------------- | -------- | -------- | ------------------------------------------------------------------------------ |
+| `id`             | string   | No       | Post ID for existing posts. Omit to create a new post in this position.        |
+| `text`           | string   | Yes      | Post content                                                                   |
+| `topic`          | string   | No       | Topic tag                                                                      |
+| `media`          | object[] | No       | Media attachments via public URL (see [Media Attachments](#media-attachments)) |
+| `spoilerRanges`  | object[] | No       | Text spoiler ranges (see [Spoilers](#spoilers-threads-only))                   |
+| `isSpoilerMedia` | boolean  | No       | If `true`, all media in this post is marked as a spoiler                       |
 
 New posts inherit `scheduledAt`, `provider`, `providerUserId`, and `teamId` from the existing thread.
 
