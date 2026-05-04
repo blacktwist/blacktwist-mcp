@@ -142,7 +142,7 @@ Most tools accept an optional `teamId` parameter to scope operations to a specif
 
 **Tools that support `teamId`:** `list_providers`, `list_posts`, `list_drafts`, `create_post`, `get_thread`, `delete_thread`, `reschedule_thread`, `list_time_slots`, `get_subscription`, `get_follow_up_templates`, and all analytics tools.
 
-**Tools without `teamId`:** `list_teams` (lists all teams), `get_user_settings` (personal settings), `edit_post` / `edit_thread` / `get_thread_follow_up` / `set_thread_follow_up` (thread-based access handles team auth internally via `userCanAccessThread`).
+**Tools without `teamId`:** `list_teams` (lists all teams), `get_user_settings` (personal settings), `list_viral_templates` / `list_viral_template_categories` (account-wide content library), `edit_post` / `edit_thread` / `get_thread_follow_up` / `set_thread_follow_up` (thread-based access handles team auth internally via `userCanAccessThread`).
 
 **Subscription access:** Analytics tools that require a paid plan will check the user's own subscription first. If the user doesn't have one, the system also checks whether any team owner the user belongs to has an active plan. This means team members can access paid features through their team owner's subscription.
 
@@ -615,6 +615,50 @@ List configured posting time slots for a provider. Time slots define preferred s
 | `teamId`     | string | No       | Team ID. If not provided, uses the active team. Pass `"personal"` for the personal account. |
 
 **Returns:** Array of `{ timeSlotHour, timeSlotMinute, weekDays }` where `weekDays` is `[0-6]` (0 = Sunday).
+
+---
+
+### Viral Templates
+
+Browse the library of viral post templates extracted from high-performing posts. Each template includes the structure, usage instructions, and the original example post with its engagement metrics.
+
+> **Paid plan required:** Both tools below require an active paid plan (user-owned plan, Lifetime Deal, or membership in a workspace whose owner has a paid plan). Free-plan users will receive: _"A paid plan is required to access viral post templates"_.
+
+#### `list_viral_templates`
+
+List viral post templates with filtering, free-text search, sorting, and pagination.
+
+| Parameter  | Type   | Required | Description                                                                                                                             |
+| ---------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `search`   | string | No       | Free-text search. Matches against the example post text (case-insensitive).                                                             |
+| `category` | string | No       | Filter to a single category. Use a value returned by `list_viral_template_categories` or the `categories` field of a previous response. |
+| `sort`     | enum   | No       | Sort by example-post engagement: `views` (default), `likes`, `replies`, or `engagementRate`. Descending.                                |
+| `page`     | number | No       | Page number, 1-indexed. Defaults to `1`.                                                                                                |
+| `pageSize` | number | No       | Items per page (1–50). Defaults to `20`. Values above 50 are clamped to 50.                                                             |
+
+**Returns:** `{ templates, categories, totalCount, page, pageSize }`.
+
+Each template:
+
+| Field            | Type   | Description                                               |
+| ---------------- | ------ | --------------------------------------------------------- |
+| `id`             | string | Template ID                                               |
+| `category`       | string | Template category                                         |
+| `template`       | string | The template structure                                    |
+| `instructions`   | string | How to use the template                                   |
+| `exampleText`    | string | The original viral post text                              |
+| `views`          | number | Views on the example post                                 |
+| `likes`          | number | Likes on the example post                                 |
+| `replies`        | number | Replies on the example post                               |
+| `engagementRate` | number | Engagement rate of the example post (likes+replies/views) |
+
+#### `list_viral_template_categories`
+
+List all available template categories with the number of templates in each. Useful as a discovery step before calling `list_viral_templates` with a `category` filter.
+
+**Parameters:** None
+
+**Returns:** `{ categories: [{ category, templateCount }] }`, ordered alphabetically by category.
 
 ---
 
