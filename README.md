@@ -470,7 +470,7 @@ Change the scheduled date/time for a thread.
 
 All analytics tools require a `providerUserId` (from `list_providers`) and accept an optional `teamId` to scope access.
 
-> **Paid plan required:** `get_metric_timeseries`, `get_post_analytics`, and `get_follower_growth` require a paid plan (user or team owner). Free-plan users will receive: _"A paid plan is required to access the analytics"_. The remaining tools (`get_live_metrics`, `get_consistency`, `get_daily_recap`, `get_recommendations`) are available on all plans.
+> **Paid plan required:** `get_metric_timeseries`, `get_post_analytics`, `get_follower_growth`, and `get_best_time_to_post` require a paid plan (user or team owner). Free-plan users will receive: _"A paid plan is required to access the analytics. Subscribe at https://blacktwist.app#pricing"_. The remaining tools (`get_live_metrics`, `get_consistency`, `get_daily_recap`, `get_recommendations`) are available on all plans.
 >
 > **Date ranges:** The `from` and `to` dates are both inclusive. For example, `from: "2026-03-01"` and `to: "2026-03-08"` includes all data from March 1 through the end of March 8.
 
@@ -501,16 +501,17 @@ Get daily data points for a specific metric over a date range.
 
 #### `get_post_analytics`
 
-Get per-post engagement metrics for posts within a date range.
+Get per-post engagement metrics for posts within a date range. Each post also carries its thread continuation parts (self-replies), so multi-post threads are returned in full.
 
-| Parameter        | Type   | Required | Description                                                                                 |
-| ---------------- | ------ | -------- | ------------------------------------------------------------------------------------------- |
-| `providerUserId` | string | Yes      | Provider user ID                                                                            |
-| `from`           | string | Yes      | Start date (ISO 8601)                                                                       |
-| `to`             | string | Yes      | End date (ISO 8601)                                                                         |
-| `teamId`         | string | No       | Team ID. If not provided, uses the active team. Pass `"personal"` for the personal account. |
+| Parameter            | Type    | Required | Description                                                                                                                 |
+| -------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `providerUserId`     | string  | Yes      | Provider user ID                                                                                                            |
+| `from`               | string  | Yes      | Start date (ISO 8601)                                                                                                       |
+| `to`                 | string  | Yes      | End date (ISO 8601)                                                                                                         |
+| `includeThreadParts` | boolean | No       | Include each post's thread continuation parts (self-replies) in a `thread` array. Defaults to `true`; pass `false` to omit. |
+| `teamId`             | string  | No       | Team ID. If not provided, uses the active team. Pass `"personal"` for the personal account.                                 |
 
-**Returns:** Up to 100 posts with `views`, `likes`, `replies`, `reposts`, `quotes`, `engagementRate`.
+**Returns:** Up to 100 posts with `views`, `likes`, `replies`, `reposts`, `quotes`, `engagementRate`. Each post also includes a `thread` array of its continuation parts, reconstructed from the user's self-replies — so a multi-post thread comes back with all of its posts. Each part has `replyId`, `text` (truncated to 200 characters), `permalink`, `timestamp`, `partOrder` (starting at `2`; the root post is part 1), and its own `analytics` (`views`, `likes`, `replies`, `reposts`, `quotes`, `engagementRate`). Single posts return an empty `thread`. Pass `includeThreadParts: false` to skip reconstruction entirely and return empty `thread` arrays.
 
 #### `get_follower_growth`
 
@@ -557,6 +558,23 @@ Get posting recommendations based on your analytics patterns.
 | `teamId`         | string | No       | Team ID. If not provided, uses the active team. Pass `"personal"` for the personal account. |
 
 **Returns:** `bestPostingHoursUtc`, `topPerformingPosts`, `currentStreak`, `recordStreak`.
+
+#### `get_best_time_to_post`
+
+Get the best times to post based on historical engagement over the last 10 weeks. Mirrors the "Best time to post" analytics chart — engagement bucketed by hour of day, both averaged across the whole week and broken down per day of the week. Hours are reported in the user's own timezone.
+
+> **Active subscription required:** This tool requires an active subscription — the user must have their own paid plan, or be part of a **team** whose owner has an active subscription. Otherwise it returns: _"The best time to post requires an active subscription. You need your own paid plan, or to be part of a team whose owner has an active subscription. Subscribe at https://blacktwist.app#pricing"_
+
+> **Timezone:** Resolved automatically server-side from the user's `notificationsTimezone` setting (defaulting to UTC). MCP callers normally cannot know the user's timezone, so they should leave `timezoneOffset` unset and let it be derived.
+
+| Parameter        | Type   | Required | Description                                                                                                                                                                                                                     |
+| ---------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `providerUserId` | string | Yes      | Provider user ID                                                                                                                                                                                                              |
+| `timezoneOffset` | number | No       | **Override** for the timezone used to bucket hours. Leave unset to use the user's configured account timezone (recommended). If set, use minutes matching JavaScript's `Date.getTimezoneOffset()` (behind UTC: UTC+2 is `-120`). |
+| `view`           | enum   | No       | `"average"`, `"daily"`, or `"both"` (default). Selects which breakdown to return.                                                                                                                                            |
+| `teamId`         | string | No       | Team ID. If not provided, uses the active team. Pass `"personal"` for the personal account.                                                                                                                                  |
+
+**Returns:** `provider`, `timezone` (IANA name, or `"custom"` when an override offset is used), `timezoneOffsetMinutes`, `timezoneInfo` (a human-readable note naming the timezone used and linking to `https://blacktwist.app/write?settings=notifications` so the user can correct it if it's wrong), and (depending on `view`) `averageView` (`bestHours` + 24 hourly `averageEngagement` values across the whole week) and `dailyView` (7 days, each with `dayName`, `bestHour`, and 24 hourly `averageEngagement` values).
 
 ---
 
