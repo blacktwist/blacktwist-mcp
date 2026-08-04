@@ -116,6 +116,7 @@ Once connected, you can ask your AI assistant things like:
 - "Show me my analytics for the last 7 days"
 - "What are my best posting times?"
 - "List my upcoming scheduled posts"
+- "Tag my latest draft with growth and product launch"
 
 ---
 
@@ -140,9 +141,9 @@ Most tools accept an optional `teamId` parameter to scope operations to a specif
 2. If `teamId` is `"personal"`, the tool operates in **personal mode** (user's own data only, no team).
 3. If `teamId` is omitted, the tool falls back to the user's **currently active team** (from user settings). If no team is active, this is equivalent to `"personal"`.
 
-**Tools that support `teamId`:** `list_providers`, `list_posts`, `list_drafts`, `create_post`, `get_thread`, `delete_thread`, `reschedule_thread`, `list_time_slots`, `get_subscription`, `get_follow_up_templates`, and all analytics tools.
+**Tools that support `teamId`:** `list_providers`, `list_posts`, `list_drafts`, `create_post`, `get_thread`, `delete_thread`, `reschedule_thread`, `list_time_slots`, `list_tags`, `get_subscription`, `get_follow_up_templates`, and all analytics tools.
 
-**Tools without `teamId`:** `list_teams` (lists all teams), `get_user_settings` (personal settings), `list_viral_templates` / `list_viral_template_categories` (account-wide content library), `edit_post` / `edit_thread` / `get_thread_follow_up` / `set_thread_follow_up` (thread-based access handles team auth internally via `userCanAccessThread`).
+**Tools without `teamId`:** `list_teams` (lists all teams), `get_user_settings` (personal settings), `list_viral_templates` / `list_viral_template_categories` (account-wide content library), `edit_post` / `edit_thread` / `get_thread_follow_up` / `set_thread_follow_up` / `get_thread_tags` / `set_thread_tags` (thread-based access handles team auth internally via `userCanAccessThread`).
 
 **Subscription access:** Analytics tools that require a paid plan will check the user's own subscription first. If the user doesn't have one, the system also checks whether any team owner the user belongs to has an active plan. This means team members can access paid features through their team owner's subscription.
 
@@ -466,6 +467,67 @@ Change the scheduled date/time for a thread.
 
 ---
 
+### Tags
+
+Tags organize posts (drafts, scheduled, and published) and can be used to filter the Posts Analytics view in the app. Tags are scoped per workspace: team tags are shared with the whole team, personal tags are private. Tags apply to a whole thread, not to individual posts within it.
+
+#### `list_tags`
+
+List the tags available in the workspace for organizing posts.
+
+| Parameter | Type   | Required | Description                                                                                 |
+| --------- | ------ | -------- | ------------------------------------------------------------------------------------------- |
+| `teamId`  | string | No       | Team ID. If not provided, uses the active team. Pass `"personal"` for the personal account. |
+
+**Returns:** `{ tags }` — array of tags with `id`, `name`, `color`.
+
+#### `get_thread_tags`
+
+Get the tags currently on a thread.
+
+| Parameter  | Type   | Required | Description                    |
+| ---------- | ------ | -------- | ------------------------------ |
+| `threadId` | string | Yes      | The thread ID to get tags for |
+
+**Returns:** `{ threadId, tags }` where `tags` is an array of `{ id, name, color }`.
+
+#### `set_thread_tags`
+
+Set the tags on a thread. This single tool covers **setting, updating, and removing** tags: it replaces the thread's existing tags with the exact set you pass in.
+
+| Parameter  | Type     | Required | Description                                                                                                                                                                         |
+| ---------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `threadId` | string   | Yes      | The thread ID to set tags for                                                                                                                                                       |
+| `tagNames` | string[] | Yes      | The **full desired set** of tag names for the thread. Replaces existing tags — not additive. Names that don't exist yet are created automatically. Pass `[]` to remove all tags. |
+
+**Behavior:**
+
+- Names are trimmed, empty entries dropped, and duplicates removed case-insensitively (`"Growth"` and `"growth"` are the same tag).
+- New tag names are created automatically in the thread's workspace scope (team thread → team tag, personal thread → personal tag) with an auto-assigned color.
+- Tag names are limited to 40 characters.
+
+**Returns:** `{ threadId, tags }` — the final tag set on the thread.
+
+**Example — tag a thread:**
+
+```json
+{
+  "threadId": "abc123",
+  "tagNames": ["growth", "product launch"]
+}
+```
+
+**Example — remove all tags:**
+
+```json
+{
+  "threadId": "abc123",
+  "tagNames": []
+}
+```
+
+---
+
 ### Analytics
 
 All analytics tools require a `providerUserId` (from `list_providers`) and accept an optional `teamId` to scope access.
@@ -730,6 +792,12 @@ Get your user settings including timezone, date format, and auto-repost config.
 
 1. `create_post` → create and schedule the post (returns `threadId`)
 2. `set_thread_follow_up` → attach a promotional reply
+
+### Organize posts with tags
+
+1. `create_post` → create the post (returns `threadId`)
+2. `set_thread_tags` → tag it (e.g. `["growth", "tips"]`) — new tag names are created automatically
+3. `list_tags` / `get_thread_tags` → discover existing tags or check what's on a thread
 
 ---
 
