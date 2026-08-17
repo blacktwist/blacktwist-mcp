@@ -143,7 +143,7 @@ Most tools accept an optional `teamId` parameter to scope operations to a specif
 
 **Tools that support `teamId`:** `list_providers`, `list_posts`, `list_drafts`, `create_post`, `get_thread`, `delete_thread`, `reschedule_thread`, `list_time_slots`, `list_tags`, `get_subscription`, `get_follow_up_templates`, and all analytics tools.
 
-**Tools without `teamId`:** `list_teams` (lists all teams), `get_user_settings` (personal settings), `list_viral_templates` / `list_viral_template_categories` (account-wide content library), `edit_post` / `edit_thread` / `get_thread_follow_up` / `set_thread_follow_up` / `get_thread_tags` / `set_thread_tags` (thread-based access handles team auth internally via `userCanAccessThread`).
+**Tools without `teamId`:** `list_teams` (lists all teams), `get_user_settings` (personal settings), `list_viral_templates` / `list_viral_template_categories` (account-wide content library), `edit_post` / `edit_thread` / `get_thread_follow_up` / `set_thread_follow_up` / `get_thread_tags` / `set_thread_tags` / `set_thread_auto_repost` (thread-based access handles team auth internally via `userCanAccessThread`).
 
 **Subscription access:** Analytics tools that require a paid plan will check the user's own subscription first. If the user doesn't have one, the system also checks whether any team owner the user belongs to has an active plan. This means team members can access paid features through their team owner's subscription.
 
@@ -199,7 +199,7 @@ Create a new post or thread. A thread is multiple posts linked together.
 
 **Default behaviors applied automatically:**
 
-- **Auto-repost:** If `autoRepost` is not provided and the user has auto-repost enabled in settings, the default delays are applied to the first post.
+- **Auto-repost:** If `autoRepost` is not provided and the user has auto-repost enabled in settings, the default delays are applied to the first post. This happens for drafts too, so a draft still carries its delays once it is scheduled — `reschedule_thread` only moves `scheduledAt` and does not add them retroactively.
 - **Follow-up (auto-plug):** If the provider has a default follow-up template enabled, it is automatically copied and attached to the thread. The response includes `autoPlugApplied: true` when this happens.
 - **Timezone:** Times without an offset are interpreted in the user's `notificationsTimezone` setting.
 
@@ -465,6 +465,24 @@ Change the scheduled date/time for a thread.
 | `scheduledAt` | string | Yes      | New datetime (ISO 8601). Times without a timezone offset are interpreted in the user's configured timezone. |
 | `teamId`      | string | No       | Team ID. If not provided, uses the active team. Pass `"personal"` for the personal account.                 |
 
+> **Note:** This changes `scheduledAt` only. It does not add auto-repost delays or a follow-up to a thread that has none — use `set_thread_auto_repost` and `set_thread_follow_up` for that.
+
+#### `set_thread_auto_repost`
+
+Set or remove auto-repost on an existing thread. Auto-repost republishes the thread's first post after each delay has elapsed since publishing.
+
+| Parameter  | Type     | Required | Description                                                                                                                                                     |
+| ---------- | -------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `threadId` | string   | Yes      | The thread ID                                                                                                                                                   |
+| `enabled`  | boolean  | Yes      | Whether auto-repost is enabled. When `false`, all delays are removed from the thread.                                                                            |
+| `delays`   | string[] | No       | Delays in hours as strings, e.g. `["168", "336", "720"]` for 7, 14 and 30 days. Required when `enabled` is `true`. Replaces any existing delays — not additive. |
+
+Delays must be positive whole numbers of hours. Enabling with an empty or missing `delays` array is rejected rather than silently clearing the thread.
+
+**Returns:** `threadId`, `enabled`, `delays`.
+
+> Use `get_user_settings` to read the user's default delays (`autoRepostDelays`), and `get_thread` to see a thread's current `autoRepostDelay`. New posts pick up the default automatically — this tool is for changing a thread after the fact.
+
 ---
 
 ### Tags
@@ -644,6 +662,8 @@ Get the best times to post based on historical engagement over the last 10 weeks
 
 The follow-up system automatically replies to your post after it reaches engagement thresholds (likes, replies, reposts) or a time delay.
 
+> **Timing:** The follow-up job only evaluates posts published within the last 24 hours. Attaching a follow-up to a thread published more than a day ago has no effect — it will never fire. Attach follow-ups before the post goes out, or within the first day after.
+
 #### `get_follow_up_templates`
 
 List saved follow-up templates for a provider.
@@ -663,7 +683,7 @@ Get the follow-up configuration for a specific thread.
 
 #### `set_thread_follow_up`
 
-Set or update the follow-up for a thread.
+Set or update the follow-up for a thread. This replaces the thread's follow-up configuration wholesale — fields you omit are reset to their defaults rather than left as they were.
 
 | Parameter                 | Type     | Required | Description                                                      |
 | ------------------------- | -------- | -------- | ---------------------------------------------------------------- |
@@ -792,6 +812,17 @@ Get your user settings including timezone, date format, and auto-repost config.
 
 1. `create_post` → create and schedule the post (returns `threadId`)
 2. `set_thread_follow_up` → attach a promotional reply
+
+> If the provider already has a default follow-up template enabled, `create_post` attaches it for you and step 2 is only needed to override it.
+
+### Add a follow-up or auto-repost to an existing thread
+
+1. `list_posts` or `list_drafts` → find the thread and its `threadId`
+2. `get_follow_up_templates` → read the provider's saved template values
+3. `set_thread_follow_up` → attach the reply, copying the fields from the template
+4. `set_thread_auto_repost` → set the delays (use `get_user_settings` for the user's defaults)
+
+> This works on threads that haven't been published yet, or published within the last 24 hours. Beyond that, the follow-up job no longer looks at the post.
 
 ### Organize posts with tags
 
